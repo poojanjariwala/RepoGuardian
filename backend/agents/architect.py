@@ -27,12 +27,12 @@ CODE_EXTENSIONS = {".js", ".jsx", ".ts", ".tsx", ".py", ".vue"}
 
 # Patterns that suggest hardcoded secrets
 SECRET_PATTERNS = [
-    (r'(?i)(password|passwd|pwd)\s*=\s*["\''][^"\']{4,}["\'']', "Hardcoded password"),
-    (r'(?i)(api_key|apikey|api-key)\s*=\s*["\''][^"\']{8,}["\'']', "Hardcoded API key"),
-    (r'(?i)(secret|token)\s*=\s*["\''][^"\']{8,}["\'']', "Hardcoded secret/token"),
-    (r'(?i)(aws_access_key_id|aws_secret_access_key)\s*=\s*["\''][^"\']{8,}["\'']', "Hardcoded AWS credential"),
-    (r'AKIA[0-9A-Z]{16}', "Possible AWS Access Key ID"),
-    (r'(?i)mongodb(\+srv)?://[^"\']+:[^"\']+@', "Hardcoded MongoDB connection string"),
+    (r"(?i)(password|passwd|pwd)\s*=\s*[\"'][^\"']{4,}[\"']", "Hardcoded password"),
+    (r"(?i)(api_key|apikey|api-key)\s*=\s*[\"'][^\"']{8,}[\"']", "Hardcoded API key"),
+    (r"(?i)(secret|token)\s*=\s*[\"'][^\"']{8,}[\"']", "Hardcoded secret/token"),
+    (r"(?i)(aws_access_key_id|aws_secret_access_key)\s*=\s*[\"'][^\"']{8,}[\"']", "Hardcoded AWS credential"),
+    (r"AKIA[0-9A-Z]{16}", "Possible AWS Access Key ID"),
+    (r"(?i)mongodb(\+srv)?://[^\"']+:[\"']@\w+", "Possible MongoDB Connection String")
 ]
 
 # Performance anti-patterns
@@ -54,7 +54,7 @@ def _read_source_files(repo_path: str) -> dict[str, str]:
                 rel = os.path.relpath(full, repo_path)
                 try:
                     with open(full, "r", encoding="utf-8", errors="ignore") as f:
-                        files[rel] = f.read(4000)
+                        files[rel] = f.read()
                 except Exception:
                     pass
     return files
@@ -148,15 +148,24 @@ def _static_analysis(repo_path: str, source_files: dict) -> list:
 
 def _llm_analysis(source_files: dict, scan_result: dict) -> str:
     """Get AI analysis of overall architecture quality."""
-    # Sample a few files for LLM
+    # Sample a few files for LLM (strictly slicing at line boundaries to prevent false errors)
     sample = {}
-    budget = 6000
-    for path, content in source_files.items():
-        if budget <= 0:
+    budget = 40000
+    for path, content in list(source_files.items())[:5]:
+        lines = content.splitlines()
+        file_snippet_lines = []
+        current_len = 0
+        for line in lines:
+            if current_len + len(line) + 1 > 4000:
+                break
+            file_snippet_lines.append(line)
+            current_len += len(line) + 1
+        
+        file_snippet = "\n".join(file_snippet_lines)
+        if budget - len(file_snippet) < 0:
             break
-        snippet = content[:min(1500, budget)]
-        sample[path] = snippet
-        budget -= len(snippet)
+        sample[path] = file_snippet
+        budget -= len(file_snippet)
 
     framework = scan_result.get("framework", "unknown")
 
@@ -164,7 +173,7 @@ def _llm_analysis(source_files: dict, scan_result: dict) -> str:
 
 Analyze these source files and provide a concise architectural review:
 
-{json.dumps({k: v[:800] for k, v in list(sample.items())[:5]}, indent=1)}
+{json.dumps(sample, indent=1)}
 
 Write a brief markdown report (max 300 words) covering:
 1. **Overall Code Quality** (1-2 sentences)
@@ -175,7 +184,7 @@ Write a brief markdown report (max 300 words) covering:
 Be specific and technical. Reference actual patterns you see in the code."""
 
     try:
-        model = genai.GenerativeModel("gemini-1.5-flash")
+        model = genai.GenerativeModel("gemini-2.5-flash")
         response = model.generate_content(prompt)
         return response.text
     except Exception as e:
