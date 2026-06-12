@@ -89,7 +89,7 @@ def _extract_json_array(text: str) -> list:
 
 
 def _read_source_files(repo_path: str) -> dict[str, str]:
-    """Read all source code files, respecting size limits."""
+    """Read all source code files."""
     files = {}
     for root, dirs, filenames in os.walk(repo_path):
         dirs[:] = [d for d in dirs if d not in IGNORED_DIRS]
@@ -99,7 +99,7 @@ def _read_source_files(repo_path: str) -> dict[str, str]:
                 rel_path = os.path.relpath(full_path, repo_path)
                 try:
                     with open(full_path, "r", encoding="utf-8", errors="ignore") as f:
-                        content = f.read(MAX_FILE_SIZE)
+                        content = f.read()
                     files[rel_path] = content
                 except Exception:
                     pass
@@ -143,11 +143,22 @@ def audit_errors(explorer_result: dict, repo_path: str) -> list:
         else:
             other_files[path] = content
 
-    # Build truncated source context (stay under ~8000 chars)
+    # Build truncated source context (stay under ~40000 chars, slicing strictly at line boundaries)
     source_context = []
-    char_budget = 8000
+    char_budget = 40000
     for path, content in {**priority_files, **other_files}.items():
-        snippet = f"\n--- FILE: {path} ---\n{content[:800]}"
+        lines = content.splitlines()
+        file_snippet_lines = []
+        current_len = 0
+        for line in lines:
+            if current_len + len(line) + 1 > 4000:
+                break
+            file_snippet_lines.append(line)
+            current_len += len(line) + 1
+        
+        file_snippet = "\n".join(file_snippet_lines)
+        snippet = f"\n--- FILE: {path} ---\n{file_snippet}\n"
+        
         if char_budget - len(snippet) < 0:
             break
         source_context.append(snippet)
@@ -190,7 +201,7 @@ Example format:
 ]"""
 
     try:
-        model = genai.GenerativeModel("gemini-1.5-flash")
+        model = genai.GenerativeModel("gemini-2.5-flash")
         response = model.generate_content(prompt)
         bugs = _extract_json_array(response.text)
         # Validate and clean each bug object
