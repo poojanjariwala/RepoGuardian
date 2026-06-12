@@ -2,6 +2,11 @@ import asyncio
 import json
 import uuid
 import os
+import sys
+
+# Reconfigure console streams to use UTF-8 on Windows
+sys.stdout.reconfigure(encoding='utf-8')
+sys.stderr.reconfigure(encoding='utf-8')
 
 from fastapi import FastAPI, BackgroundTasks, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
