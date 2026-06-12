@@ -10,6 +10,10 @@ import sys
 import json
 import os
 
+# Reconfigure console streams to use UTF-8 on Windows
+sys.stdout.reconfigure(encoding='utf-8')
+sys.stderr.reconfigure(encoding='utf-8')
+
 sys.path.insert(0, os.path.dirname(__file__))
 
 from orchestrator import run_analysis
