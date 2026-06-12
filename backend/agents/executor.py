@@ -64,7 +64,7 @@ def generate_diffs(bugs: list, repo_path: str) -> list:
     For each bug, generate the fixed file content.
     Returns list of diff objects.
     """
-    model = genai.GenerativeModel("gemini-1.5-flash")
+    model = genai.GenerativeModel("gemini-2.5-flash")
     diffs = []
 
     # Only attempt to fix bugs with a known file
@@ -94,7 +94,7 @@ BUG:
 - Problematic code: {bug.get('code_snippet', '')}
 
 ORIGINAL FILE CONTENT:
-{original_content[:4000]}
+{original_content}
 Return ONLY the complete fixed file content, with NO explanation, NO markdown fences, NO preamble.
 Just the raw fixed code that can be directly written to the file.
 Make the minimal change needed to fix the specific bug described. Do not refactor unrelated code."""
@@ -190,11 +190,11 @@ def push_pr(job_result: dict) -> str:
         except Exception as e:
             print(f"[Executor] Error committing {diff['file']}: {e}")
 
-    # Build PR body
-    bug_list = "\n".join(
-        f"- **{b['error_type']}** in `{b['file']}`{f' (line {b[\"line_number\"]})' if b.get('line_number') else ''}: {b['error_description']}"
-        for b in bugs[:10]
-    )
+    bug_lines = []
+    for b in bugs[:10]:
+        line_str = f" (line {b['line_number']})" if b.get('line_number') else ""
+        bug_lines.append(f"- **{b['error_type']}** in `{b['file']}`{line_str}: {b['error_description']}")
+    bug_list = "\n".join(bug_lines)
 
     arch_issues = arch.get("static_issues", [])
     arch_list = "\n".join(
