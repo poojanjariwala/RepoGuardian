@@ -111,7 +111,9 @@ def scan_repo(repo_path: str) -> dict:
         for f in file_tree
     )
 
-    # Try to infer without LLM first (faster, more reliable)
+    has_python_files = any(f.endswith(".py") for f in file_tree)
+    is_python_project = bool(pyproject) or has_python_files
+
     framework = "unknown"
     start_command = "npm start"
     install_command = "npm install"
@@ -138,26 +140,35 @@ def scan_repo(repo_path: str) -> dict:
             install_command = "npm install"
         except json.JSONDecodeError:
             pass
-    elif pyproject:
-        if "fastapi" in pyproject.lower():
+    elif is_python_project:
+        if pyproject and "fastapi" in pyproject.lower():
             framework = "fastapi"
             start_command = "uvicorn main:app --reload"
             install_command = "pip install -r requirements.txt"
-        elif "django" in pyproject.lower():
+        elif pyproject and "django" in pyproject.lower():
             framework = "django"
             start_command = "python manage.py runserver"
             install_command = "pip install -r requirements.txt"
-        elif "flask" in pyproject.lower():
+        elif pyproject and "flask" in pyproject.lower():
             framework = "flask"
             start_command = "python app.py"
             install_command = "pip install -r requirements.txt"
+        else:
+            # Generic Python scripts / ML repos (no web server)
+            start_command = ""
+            if "requirements.txt" in file_tree:
+                install_command = "pip install -r requirements.txt"
+            else:
+                install_command = ""
+
+    has_web_server = (framework != "unknown") or bool(package_json)
 
     # Use LLM only for description and entry file (less critical)
     description = "A web application"
     entry_file = "src/index.js"
 
     try:
-        model = genai.GenerativeModel("gemini-1.5-flash")
+        model = genai.GenerativeModel("gemini-2.5-flash")
         prompt = f"""Analyze this repository and return ONLY valid JSON (no markdown, no explanation).
 
 File tree (first 50 files):
@@ -192,5 +203,6 @@ Return this exact JSON structure:
         "env_file_exists": has_env_file,
         "dockerfile_exists": has_dockerfile,
         "has_package_json": bool(package_json),
-        "is_python": bool(pyproject),
+        "is_python": is_python_project,
+        "has_web_server": has_web_server,
     }
