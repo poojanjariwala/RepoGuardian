@@ -50,12 +50,14 @@ def _run_install(path: str, install_cmd: str, log_fn) -> bool:
     """Run dependency installation. Returns True on success."""
     log_fn("Explorer", f"Running: {install_cmd}")
     try:
+        cmd_args = install_cmd if sys.platform == "win32" else install_cmd.split()
         result = subprocess.run(
-            install_cmd.split(),
+            cmd_args,
             cwd=path,
             capture_output=True,
             text=True,
             timeout=180,  # 3 min max for npm install
+            shell=(sys.platform == "win32")
         )
         if result.returncode != 0:
             log_fn("Explorer", f"Install warning: {result.stderr[-300:] if result.stderr else 'unknown'}", "warning")
@@ -89,6 +91,17 @@ def explore_app(
         jobs[job_id]["logs"].append({"agent": agent, "message": msg, "level": level})
         print(f"[{agent}] {msg}")
 
+    # ── Skip server start if not a web application ──────────────────────────
+    if not scan_result.get("has_web_server", True):
+        log_fn("Explorer", "No web server detected for this project stack. Skipping browser automation and running static checks.", "info")
+        return {
+            "console_errors": [],
+            "network_errors": [],
+            "pages_visited": [],
+            "screenshot_b64": None,
+            "server_started": False,
+        }
+
     install_cmd = scan_result.get("install_command", "npm install")
     start_cmd = scan_result.get("start_command", "npm start")
     framework = scan_result.get("framework", "unknown")
@@ -97,40 +110,50 @@ def explore_app(
     # ── Install dependencies ────────────────────────────────────────────────
     if scan_result.get("has_package_json"):
         _run_install(repo_path, install_cmd, log_fn)
-    elif is_python:
+    elif is_python and install_cmd:
         _run_install(repo_path, install_cmd, log_fn)
 
     # ── Start the dev server ────────────────────────────────────────────────
     port = _find_free_port()
     log_fn("Explorer", f"Starting dev server on port {port}: {start_cmd}")
 
+    bin_path = os.path.abspath(os.path.join(repo_path, "node_modules", ".bin"))
     env = {
         **os.environ,
         "PORT": str(port),
         "BROWSER": "none",      # Prevent CRA from opening a browser
         "CI": "true",           # Suppress interactive prompts
         "NODE_ENV": "development",
+        "PATH": f"{bin_path}{os.pathsep}{os.environ.get('PATH', '')}"
     }
 
     try:
+        cmd_args = start_cmd if sys.platform == "win32" else start_cmd.split()
+        log_file_path = os.path.join(repo_path, "server_startup.log")
+        log_file = open(log_file_path, "w", encoding="utf-8")
         server_proc = subprocess.Popen(
-            start_cmd.split(),
+            cmd_args,
             cwd=repo_path,
             env=env,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
+            stdout=log_file,
+            stderr=log_file,
             preexec_fn=os.setsid if sys.platform != "win32" else None,
+            shell=(sys.platform == "win32")
         )
 
         # Wait for server to come up
         log_fn("Explorer", f"Waiting for server on port {port}...")
-        server_ready = _wait_for_server(port, timeout=45)
+        server_ready = _wait_for_server(port, timeout=120)
 
         if not server_ready:
             log_fn("Explorer",
                    "Server did not start in time. Analyzing static files instead.", "warning")
             return {
-                "console_errors": ["Server failed to start — static analysis only"],
+                "console_errors": [{
+                    "type": "server_error",
+                    "text": "Server failed to start — static analysis only",
+                    "location": ""
+                }],
                 "network_errors": [],
                 "pages_visited": [],
                 "screenshot_b64": None,
