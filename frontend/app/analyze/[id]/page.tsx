@@ -138,6 +138,17 @@ export default function AnalyzePage() {
 
           {/* Running status badge */}
           <div className="flex items-center gap-3">
+            {status === "done" && result?.architecture?.score !== undefined && (
+              <div className="flex items-center gap-1.5 bg-slate-900 border border-slate-800 rounded-xl px-3.5 py-1.5 shadow-sm">
+                <span className="text-[10px] font-display font-semibold text-slate-500 uppercase tracking-wider">Health:</span>
+                <span className={`text-xs font-mono font-bold ${
+                  result.architecture.score >= 80 ? "text-emerald-400" :
+                  result.architecture.score >= 50 ? "text-amber-400" : "text-rose-400"
+                }`}>
+                  {result.architecture.score}/100
+                </span>
+              </div>
+            )}
             <StatusBadge status={status} />
           </div>
         </div>
@@ -631,6 +642,7 @@ function DiffCollapse({ diff }: { diff: Diff }) {
 
 function ArchitecturePanel({ result }: { result: JobResult }) {
   const { static_issues, ai_analysis, summary } = result.architecture;
+  const score = result.architecture.score !== undefined ? result.architecture.score : 100;
 
   const severityGlows = {
     critical: "bg-rose-500/10 border-rose-500/20 text-rose-400",
@@ -638,20 +650,76 @@ function ArchitecturePanel({ result }: { result: JobResult }) {
     info: "bg-cyan-500/10 border-cyan-500/20 text-cyan-400",
   };
 
+  // Circular progress gauge configuration
+  const radius = 35;
+  const circumference = 2 * Math.PI * radius;
+  const strokeDashoffset = circumference - (score / 100) * circumference;
+  const scoreColor = score >= 80 ? "text-emerald-400" : score >= 50 ? "text-amber-400" : "text-rose-400";
+  const strokeColor = score >= 80 ? "#10b981" : score >= 50 ? "#f59e0b" : "#f43f5e";
+
   return (
     <div className="space-y-6">
       
-      {/* Top summary row */}
-      <div className="flex flex-wrap gap-3">
-        <span className={`text-xs font-bold uppercase tracking-wider px-4 py-1.5 rounded-full border ${severityGlows.critical}`}>
-          🚨 {summary.critical} Critical Security
-        </span>
-        <span className={`text-xs font-bold uppercase tracking-wider px-4 py-1.5 rounded-full border ${severityGlows.warning}`}>
-          ⚠️ {summary.warnings} Warnings
-        </span>
-        <span className={`text-xs font-bold uppercase tracking-wider px-4 py-1.5 rounded-full border ${severityGlows.info}`}>
-          ℹ️ {summary.info} Structural Notes
-        </span>
+      {/* Visual Health Score Card */}
+      <div className="glass-panel border border-slate-800/60 bg-slate-950/20 rounded-2xl p-6 flex flex-col sm:flex-row items-center gap-6 shadow-xl">
+        <div className="relative flex items-center justify-center shrink-0 w-24 h-24">
+          <svg className="w-full h-full transform -rotate-90" viewBox="0 0 100 100">
+            {/* Background circle */}
+            <circle
+              cx="50"
+              cy="50"
+              r={radius}
+              fill="transparent"
+              stroke="#1e293b"
+              strokeWidth="8"
+            />
+            {/* Foreground progress circle */}
+            <circle
+              cx="50"
+              cy="50"
+              r={radius}
+              fill="transparent"
+              stroke={strokeColor}
+              strokeWidth="8"
+              strokeDasharray={circumference}
+              strokeDashoffset={strokeDashoffset}
+              strokeLinecap="round"
+              className="transition-all duration-1000 ease-out"
+            />
+          </svg>
+          <div className="absolute flex flex-col items-center justify-center text-center">
+            <span className={`text-xl font-mono font-black ${scoreColor}`}>
+              {score}
+            </span>
+            <span className="text-[8px] text-slate-500 font-bold uppercase tracking-wider">Score</span>
+          </div>
+        </div>
+        <div className="flex-1 text-center sm:text-left space-y-1">
+          <h3 className="font-display font-bold text-base text-white tracking-wide">
+            Architecture Health Score
+          </h3>
+          <p className="text-slate-450 text-xs leading-relaxed max-w-xl">
+            {score >= 80 ? (
+              <span className="text-emerald-450 font-bold">Excellent Health: </span>
+            ) : score >= 50 ? (
+              <span className="text-amber-450 font-bold">Needs Improvement: </span>
+            ) : (
+              <span className="text-rose-450 font-bold">Critical Vulnerabilities: </span>
+            )}
+            This metric summarizes repository structure, security variables hygiene, and performance patterns identified in your static project files.
+          </p>
+          <div className="flex flex-wrap justify-center sm:justify-start gap-2 pt-2">
+            <span className={`text-[10px] font-bold uppercase tracking-wider px-3 py-1 rounded-full border ${severityGlows.critical}`}>
+              🚨 {summary.critical} Critical
+            </span>
+            <span className={`text-[10px] font-bold uppercase tracking-wider px-3 py-1 rounded-full border ${severityGlows.warning}`}>
+              ⚠️ {summary.warnings} Warnings
+            </span>
+            <span className={`text-[10px] font-bold uppercase tracking-wider px-3 py-1 rounded-full border ${severityGlows.info}`}>
+              ℹ️ {summary.info} Notes
+            </span>
+          </div>
+        </div>
       </div>
 
       {/* Grid: Left lists the specific static analysis issues, right is AI analysis summary */}
