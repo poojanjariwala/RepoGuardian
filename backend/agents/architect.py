@@ -39,6 +39,7 @@ SECRET_PATTERNS = [
 PERF_PATTERNS = [
     (r'for\s*\(.+\)\s*\{[^}]*for\s*\(.+\)\s*\{', "Nested loop (possible O(n²)) detected"),
     (r'\.forEach\(.+\.forEach\(', "Nested forEach (possible O(n²))"),
+    (r'\.map\s*\([\s\S]+?\.map\s*\(', "Nested map loops (possible O(n²))"),
     (r'document\.querySelector.+for\s*\(', "DOM query inside loop — very slow"),
     (r'await\s+\w+\s*\([^)]*\)\s*;\s*\n\s*await\s+\w+\s*\([^)]*\)\s*;', "Sequential awaits — consider Promise.all()"),
 ]
