@@ -13,11 +13,10 @@ import json
 import re
 from typing import Optional
 
-import google.generativeai as genai
 from dotenv import load_dotenv
+from agents.gemini_client import generate_content_with_fallback
 
 load_dotenv()
-genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
 
 CODE_EXTENSIONS = {".js", ".jsx", ".ts", ".tsx", ".py", ".vue", ".svelte"}
 IGNORED_DIRS = {"node_modules", ".git", "__pycache__", ".next", "dist", "build"}
@@ -201,8 +200,7 @@ Example format:
 ]"""
 
     try:
-        model = genai.GenerativeModel("gemini-2.5-flash")
-        response = model.generate_content(prompt)
+        response = generate_content_with_fallback(prompt)
         bugs = _extract_json_array(response.text)
         # Validate and clean each bug object
         cleaned = []
