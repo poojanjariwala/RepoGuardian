@@ -1,53 +1,96 @@
-import os
-import google.generativeai as genai
+"""
+GitHub API client helper — Dhruv's file.
+Wraps PyGithub for common operations used across the project.
+"""
 
-def generate_content_with_fallback(prompt: str, model_name: str = "gemini-2.5-flash", system_instruction: str = None):
+import os
+import re
+from github import Github, GithubException
+from dotenv import load_dotenv
+
+load_dotenv()
+
+
+def get_client() -> Github:
+    """Return an authenticated GitHub client."""
+    token = os.getenv("GITHUB_TOKEN")
+    if not token:
+        raise EnvironmentError(
+            "GITHUB_TOKEN is not set. Add it to backend/.env\n"
+            "Get one at: github.com → Settings → Developer Settings → Personal Access Tokens"
+        )
+    return Github(token)
+
+
+def parse_repo_name(repo_url: str) -> str:
     """
-    Tries calling Gemini API using configured keys (GEMINI_API_KEY_1 to 5) one-by-one.
-    If a key fails (due to quota or auth), it automatically falls back to the next key.
+    Extract 'owner/repo' from any GitHub URL format.
+    Handles:
+      https://github.com/owner/repo
+      https://github.com/owner/repo.git
+      git@github.com:owner/repo.git
     """
-    keys = []
-    
-    # Check numbered keys first
-    for i in range(1, 6):
-        key = os.getenv(f"GEMINI_API_KEY_{i}")
-        if key and key.strip() and "your_gemini_api_key" not in key:
-            keys.append(key.strip())
-            
-    # Also support default GEMINI_API_KEY as final fallback
-    default_key = os.getenv("GEMINI_API_KEY")
-    if default_key and default_key.strip():
-        keys.append(default_key.strip())
-        
-    # Remove duplicates while preserving list order
-    unique_keys = []
-    for k in keys:
-        if k not in unique_keys:
-            unique_keys.append(k)
-            
-    if not unique_keys:
-        raise ValueError("No valid Gemini API keys found. Please set GEMINI_API_KEY_1 in your .env file.")
-        
-    last_err = None
-    for idx, key in enumerate(unique_keys, 1):
-        try:
-            # Mask key for printing
-            masked_key = f"{key[:6]}...{key[-4:]}" if len(key) > 10 else "..."
-            print(f"[Gemini Client] Attempting request using Key #{idx} ({masked_key})")
-            
-            genai.configure(api_key=key)
-            model = genai.GenerativeModel(
-                model_name=model_name,
-                system_instruction=system_instruction
-            )
-            response = model.generate_content(prompt)
-            # Accessing response.text throws an exception if the response was blocked or invalid
-            _ = response.text
-            print(f"[Gemini Client] Request succeeded with Key #{idx} ✓")
-            return response
-        except Exception as e:
-            print(f"[Gemini Client] Key #{idx} failed: {e}")
-            last_err = e
-            
-    # If all keys failed, raise the last exception
-    raise last_err
+    match = re.search(r"github\.com[/:]([^/]+/[^/\s\.]+)", repo_url)
+    if not match:
+        raise ValueError(f"Cannot parse GitHub repo name from: {repo_url}")
+    return match.group(1)
+
+
+def repo_is_accessible(repo_url: str) -> bool:
+    """Check if we can access the given repo with our token."""
+    try:
+        g = get_client()
+        name = parse_repo_name(repo_url)
+        g.get_repo(name)
+        return True
+    except GithubException:
+        return False
+
+
+def trigger_workflow(
+    our_repo_name: str,
+    repo_url_to_analyze: str,
+    job_id: str,
+    workflow_file: str = "agent-runner.yml",
+    branch: str = "main",
+) -> bool:
+    """
+    Trigger the agent-runner GitHub Actions workflow via API.
+    Use this if you want to run analysis in GitHub Actions instead of locally.
+    """
+    try:
+        g = get_client()
+        repo = g.get_repo(our_repo_name)
+        workflow = repo.get_workflow(workflow_file)
+        workflow.create_dispatch(
+            ref=branch,
+            inputs={
+                "repo_url": repo_url_to_analyze,
+                "job_id": job_id,
+            }
+        )
+        print(f"[GitHub] Triggered workflow for job {job_id}")
+        return True
+    except GithubException as e:
+        print(f"[GitHub] Failed to trigger workflow: {e.data.get('message', str(e))}")
+        return False
+
+
+def get_workflow_run_status(our_repo_name: str, job_id: str) -> dict:
+    """
+    Poll the status of a running workflow.
+    Returns dict with: status, conclusion, html_url
+    """
+    try:
+        g = get_client()
+        repo = g.get_repo(our_repo_name)
+        runs = repo.get_workflow_runs(workflow_id="agent-runner.yml", branch="main")
+        for run in runs:
+            return {
+                "status": run.status,
+                "conclusion": run.conclusion,
+                "html_url": run.html_url,
+            }
+    except Exception as e:
+        print(f"[GitHub] Could not get workflow status: {e}")
+    return {"status": "unknown", "conclusion": None, "html_url": None}
