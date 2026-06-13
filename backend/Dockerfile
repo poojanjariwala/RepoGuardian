@@ -1,5 +1,5 @@
-# Use official Python runtime as a parent image
-FROM python:3.10-slim
+# Use Microsoft's official Playwright image for Python (based on Ubuntu, with all browser dependencies pre-installed)
+FROM mcr.microsoft.com/playwright/python:v1.44.0-jammy
 
 # Install git (required for cloning scanned repositories)
 RUN apt-get update && apt-get install -y git && rm -rf /var/lib/apt/lists/*
@@ -11,9 +11,8 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Install Playwright and browser dependencies
+# Install the Chromium browser binary
 RUN playwright install chromium
-RUN playwright install-deps chromium
 
 # Copy the rest of the application code
 COPY . .
