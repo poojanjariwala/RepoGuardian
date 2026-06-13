@@ -9,12 +9,11 @@ import os
 import re
 import json
 
-import google.generativeai as genai
-from github import Github, GithubException
 from dotenv import load_dotenv
+from github import Github, GithubException
+from agents.gemini_client import generate_content_with_fallback
 
 load_dotenv()
-genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
 
 IGNORED_DIRS = {"node_modules", ".git", "__pycache__", ".next", "dist", "build"}
 
@@ -64,7 +63,6 @@ def generate_diffs(bugs: list, repo_path: str) -> list:
     For each bug, generate the fixed file content.
     Returns list of diff objects.
     """
-    model = genai.GenerativeModel("gemini-2.5-flash")
     diffs = []
 
     # Only attempt to fix bugs with a known file
@@ -100,7 +98,7 @@ Just the raw fixed code that can be directly written to the file.
 Make the minimal change needed to fix the specific bug described. Do not refactor unrelated code."""
 
         try:
-            response = model.generate_content(prompt)
+            response = generate_content_with_fallback(prompt)
             fixed_content = _extract_code_from_response(response.text, original_content)
 
             diffs.append({
