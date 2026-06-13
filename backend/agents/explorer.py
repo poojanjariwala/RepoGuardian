@@ -21,6 +21,7 @@ import socket
 import time
 import signal
 import sys
+import base64
 from typing import Optional
 
 from dotenv import load_dotenv
@@ -225,11 +226,14 @@ def explore_app(
                 # Visit the home page
                 try:
                     log_fn("Explorer", f"Navigating to {base_url}")
-                    page.goto(base_url, wait_until="networkidle", timeout=15000)
+                    page.goto(base_url, wait_until="load", timeout=30000)
                     pages_visited.append("/")
+                    
+                    # Wait 3 seconds to let React render cycles and infinite loops execute
+                    page.wait_for_timeout(3000)
 
                     # Take a screenshot for the report
-                    screenshot_b64 = page.screenshot(type="png").hex()
+                    screenshot_b64 = base64.b64encode(page.screenshot(type="png")).decode("utf-8")
                     log_fn("Explorer", "Home page loaded and screenshot captured ✓")
 
                     # Discover and click interactive elements
