@@ -520,17 +520,17 @@ function BugCard({ bug }: { bug: Bug }) {
         onClick={() => setOpen(!open)}
         className="w-full flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 bg-slate-900/30 hover:bg-slate-900/60 transition-colors gap-3 text-left"
       >
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 shrink-0">
           <span className={`text-[9px] font-bold tracking-wider px-2 py-0.5 rounded border uppercase ${severityColors[bug.severity]}`}>
             {bug.severity}
           </span>
-          <span className="font-mono text-xs text-cyan-400 break-all">{bug.file}</span>
+          <span className="font-mono text-xs text-cyan-400 whitespace-nowrap">{bug.file}</span>
           {bug.line_number && (
             <span className="text-slate-600 text-[10px] font-mono shrink-0">:{bug.line_number}</span>
           )}
         </div>
-        <div className="flex items-center gap-2 w-full sm:w-auto">
-          <span className="text-slate-300 text-xs font-medium truncate flex-1 sm:max-w-md">
+        <div className="flex items-center gap-2 w-full sm:flex-1">
+          <span className="text-slate-300 text-xs font-medium flex-1">
             {bug.error_description}
           </span>
           <span className="text-slate-500 text-[10px] shrink-0 font-mono ml-auto">
