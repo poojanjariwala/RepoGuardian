@@ -197,7 +197,8 @@ def analyze_architecture(repo_path: str, scan_result: dict) -> dict:
     {
         static_issues: list of structured issue objects,
         ai_analysis: markdown string,
-        summary: { critical: int, warnings: int, info: int }
+        summary: { critical: int, warnings: int, info: int },
+        score: int
     }
     """
     source_files = _read_source_files(repo_path)
@@ -210,8 +211,21 @@ def analyze_architecture(repo_path: str, scan_result: dict) -> dict:
         "info": sum(1 for i in static_issues if i.get("severity") == "info"),
     }
 
+    # Calculate Architecture Health Score (0-100)
+    score = 100
+    for issue in static_issues:
+        severity = issue.get("severity", "warning")
+        if severity == "critical":
+            score -= 15
+        elif severity == "warning":
+            score -= 5
+        elif severity == "info":
+            score -= 2
+    score = max(0, score)
+
     return {
         "static_issues": static_issues,
         "ai_analysis": ai_analysis,
         "summary": summary,
+        "score": score,
     }
