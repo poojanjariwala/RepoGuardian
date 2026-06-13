@@ -62,6 +62,7 @@ export interface JobResult {
     static_issues: ArchitectureIssue[];
     ai_analysis: string;
     summary: { critical: number; warnings: number; info: number };
+    score: number;
   };
   diffs: Diff[];
 }
