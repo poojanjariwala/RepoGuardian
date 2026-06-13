@@ -8,11 +8,10 @@ import os
 import json
 import re
 
-import google.generativeai as genai
 from dotenv import load_dotenv
+from agents.gemini_client import generate_content_with_fallback
 
 load_dotenv()
-genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
 
 
 IGNORED_DIRS = {
@@ -168,7 +167,6 @@ def scan_repo(repo_path: str) -> dict:
     entry_file = "src/index.js"
 
     try:
-        model = genai.GenerativeModel("gemini-2.5-flash")
         prompt = f"""Analyze this repository and return ONLY valid JSON (no markdown, no explanation).
 
 File tree (first 50 files):
@@ -183,8 +181,7 @@ Return this exact JSON structure:
   "entry_file": "the main entry point file path",
   "likely_port": 3000
 }}"""
-
-        response = model.generate_content(prompt)
+        response = generate_content_with_fallback(prompt)
         parsed = _extract_json(response.text)
         description = parsed.get("description", description)
         entry_file = parsed.get("entry_file", entry_file)
