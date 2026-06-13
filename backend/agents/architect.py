@@ -15,11 +15,10 @@ import os
 import re
 import json
 
-import google.generativeai as genai
 from dotenv import load_dotenv
+from agents.gemini_client import generate_content_with_fallback
 
 load_dotenv()
-genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
 
 IGNORED_DIRS = {"node_modules", ".git", "__pycache__", ".next", "dist", "build"}
 CODE_EXTENSIONS = {".js", ".jsx", ".ts", ".tsx", ".py", ".vue"}
@@ -185,8 +184,7 @@ Write a brief markdown report (max 300 words) covering:
 Be specific and technical. Reference actual patterns you see in the code."""
 
     try:
-        model = genai.GenerativeModel("gemini-2.5-flash")
-        response = model.generate_content(prompt)
+        response = generate_content_with_fallback(prompt)
         return response.text
     except Exception as e:
         return f"AI analysis unavailable: {str(e)}"
