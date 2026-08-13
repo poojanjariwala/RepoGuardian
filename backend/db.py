@@ -207,3 +207,72 @@ def get_user_pr_history(user_id: str, limit: int = 50) -> list:
         .execute()
     )
     return result.data or []
+
+
+def save_scores(job_id: str, scores: dict):
+    """Update analysis_jobs row with health score and scores JSON if available."""
+    db = get_db()
+    health_val = scores.get("health") if isinstance(scores.get("health"), int) else None
+    try:
+        db.table("analysis_jobs").update({
+            "health_score": health_val,
+            "scores": scores
+        }).eq("id", job_id).execute()
+    except Exception:
+        try:
+            db.table("analysis_jobs").update({
+                "health_score": health_val
+            }).eq("id", job_id).execute()
+        except Exception as e:
+            print(f"[DB] save_scores failed: {e}")
+
+
+def save_security_report(job_id: str, security_report: dict):
+    """Insert into a security_reports table or store as JSON string in analysis_jobs.security_report column."""
+    db = get_db()
+    import json
+    try:
+        db.table("security_reports").insert({
+            "job_id": job_id,
+            "report": security_report
+        }).execute()
+    except Exception:
+        try:
+            db.table("analysis_jobs").update({
+                "security_report": security_report
+            }).eq("id", job_id).execute()
+        except Exception:
+            try:
+                db.table("analysis_jobs").update({
+                    "security_report": json.dumps(security_report)
+                }).eq("id", job_id).execute()
+            except Exception as e:
+                print(f"[DB] save_security_report failed: {e}")
+
+
+def save_market_report(job_id: str, market_report: dict):
+    """Store market report as JSON string in analysis_jobs.market_report column."""
+    db = get_db()
+    import json
+    try:
+        db.table("analysis_jobs").update({
+            "market_report": market_report
+        }).eq("id", job_id).execute()
+    except Exception:
+        try:
+            db.table("analysis_jobs").update({
+                "market_report": json.dumps(market_report)
+            }).eq("id", job_id).execute()
+        except Exception as e:
+            print(f"[DB] save_market_report failed: {e}")
+
+
+def save_screenshot(job_id: str, screenshot_b64: str):
+    """Store screenshot base64 in analysis_jobs.screenshot_b64 column."""
+    db = get_db()
+    try:
+        db.table("analysis_jobs").update({
+            "screenshot_b64": screenshot_b64
+        }).eq("id", job_id).execute()
+    except Exception as e:
+        print(f"[DB] save_screenshot failed: {e}")

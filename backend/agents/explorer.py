@@ -233,8 +233,17 @@ def explore_app(
                     page.wait_for_timeout(3000)
 
                     # Take a screenshot for the report
-                    screenshot_b64 = base64.b64encode(page.screenshot(type="png")).decode("utf-8")
+                    import base64
+                    screenshot_bytes = page.screenshot(type="png", full_page=False)
+                    screenshot_b64 = base64.b64encode(screenshot_bytes).decode("utf-8")
                     log_fn("Explorer", "Home page loaded and screenshot captured ✓")
+
+                    # Also call db.save_screenshot(job_id, screenshot_b64) if db is available
+                    try:
+                        import db
+                        db.save_screenshot(job_id, screenshot_b64)
+                    except Exception as db_err:
+                        print(f"[Explorer] Database save screenshot failed: {db_err}")
 
                     # Discover and click interactive elements
                     log_fn("Explorer", "Exploring navigation links and buttons...")

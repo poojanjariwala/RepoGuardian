@@ -1,5 +1,5 @@
 """
-Orchestrator: chains all 5 agents in sequence.
+Orchestrator: chains all 6 agents in sequence.
 Each agent logs to jobs[job_id]["logs"] in real-time so the frontend
 can stream progress via SSE.
 """
@@ -9,11 +9,13 @@ import subprocess
 import shutil
 import os
 
+import db
 from agents.scanner import scan_repo
 from agents.explorer import explore_app
 from agents.auditor import audit_errors
 from agents.architect import analyze_architecture
 from agents.executor import generate_diffs
+from agents.market_agent import analyze_market
 
 
 def log(jobs: dict, job_id: str, agent: str, message: str, level: str = "info"):
@@ -57,12 +59,19 @@ def run_analysis(job_id: str, repo_url: str, jobs: dict):
         log(jobs, job_id, "Explorer", "Installing dependencies (this may take a minute)...")
         explorer_result = explore_app(tmp_path, scan_result, jobs, job_id)
         error_count = len(explorer_result.get("console_errors", []))
+        screenshot_b64 = explorer_result.get("screenshot_b64")
         log(jobs, job_id, "Explorer",
             f"Exploration complete. Found {error_count} console error(s) ✓", "success")
 
         # ── STEP 4: Auditor Agent ──────────────────────────────────────────
         log(jobs, job_id, "Auditor", "Mapping errors to source code lines...")
-        bugs = audit_errors(explorer_result, tmp_path)
+        bugs, scores, security_report = audit_errors(explorer_result, tmp_path)
+        try:
+            db.save_scores(job_id, scores)
+            db.save_security_report(job_id, security_report)
+        except Exception as db_err:
+            print(f"[Orchestrator] Database save failed for auditor: {db_err}")
+
         log(jobs, job_id, "Auditor",
             f"Identified {len(bugs)} fixable bug(s) in source code ✓", "success")
 
@@ -83,12 +92,27 @@ def run_analysis(job_id: str, repo_url: str, jobs: dict):
             diffs = []
             log(jobs, job_id, "Executor", "No bugs to fix — skipping diff generation", "info")
 
+        # ── STEP 7: Market Agent ───────────────────────────────────────────
+        log(jobs, job_id, "Market", "Analyzing market potential and competitive landscape...")
+        market_report = analyze_market(tmp_path, scan_result)
+        try:
+            db.save_market_report(job_id, market_report)
+        except Exception as db_err:
+            print(f"[Orchestrator] Database save failed for market report: {db_err}")
+
+        log(jobs, job_id, "Market", f"Viability score: {market_report.get('viability_score', 0)}/100 ✓", "success")
+
         # ── DONE ───────────────────────────────────────────────────────────
         log(jobs, job_id, "System",
             "Analysis complete! Review the findings and click 'Approve & Push PR' to create the Pull Request.",
             "success")
 
         jobs[job_id]["status"] = "done"
+        jobs[job_id]["scores"] = scores
+        jobs[job_id]["security_report"] = security_report
+        jobs[job_id]["market_report"] = market_report
+        jobs[job_id]["screenshot_b64"] = screenshot_b64
+        
         jobs[job_id]["result"] = {
             "repo_url": repo_url,
             "tmp_path": tmp_path,
@@ -97,6 +121,10 @@ def run_analysis(job_id: str, repo_url: str, jobs: dict):
             "bugs": bugs,
             "architecture": arch_result,
             "diffs": diffs,
+            "scores": scores,
+            "security_report": security_report,
+            "market_report": market_report,
+            "screenshot_b64": screenshot_b64,
         }
 
     except Exception as e:

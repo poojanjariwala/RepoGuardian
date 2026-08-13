@@ -86,6 +86,10 @@ async def stream_status(job_id: str):
                 "all_logs": current_logs,
                 "result": job.get("result"),
                 "error": job.get("error"),
+                "scores": job.get("scores"),
+                "security_report": job.get("security_report"),
+                "market_report": job.get("market_report"),
+                "screenshot_b64": job.get("screenshot_b64"),
             }
             yield {"data": json.dumps(payload)}
 
@@ -143,3 +147,25 @@ def cleanup_job(job_id: str):
         except Exception:
             pass
     return {"deleted": job_id}
+
+
+@app.get("/api/screenshot/{job_id}")
+def get_screenshot(job_id: str):
+    # Try in-memory first
+    if job_id in jobs:
+        screenshot_b64 = jobs[job_id].get("screenshot_b64")
+        if screenshot_b64:
+            return {"screenshot_b64": screenshot_b64}
+    
+    # Try database
+    try:
+        import db
+        job_data = db.get_job_full(job_id)
+        if job_data and "job" in job_data:
+            screenshot_b64 = job_data["job"].get("screenshot_b64")
+            if screenshot_b64:
+                return {"screenshot_b64": screenshot_b64}
+    except Exception as e:
+        print(f"[API] Failed to get screenshot from DB: {e}")
+        
+    raise HTTPException(status_code=404, detail="Screenshot not found")
