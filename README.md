@@ -1,12 +1,12 @@
 # 🛡️ RepoGuardian — Autonomous AI-Powered Code Auditor & PR Fixer
 
-RepoGuardian is a next-generation **multi-agent fullstack application** designed to audit, explore, and automatically repair software repositories. By chaining together five distinct AI agents, it clones a target repository, runs it in a sandboxed runtime environment to capture live logs/errors (via Playwright), maps runtime issues back to source lines, conducts security/architectural audits, and generates complete, push-ready pull requests for fixes.
+RepoGuardian is a next-generation **multi-agent fullstack application** designed to audit, explore, and automatically repair software repositories. By chaining together six distinct AI agents, it clones a target repository, runs it in a sandboxed runtime environment to capture live logs/errors (via Playwright), maps runtime issues back to source lines, conducts security/architectural audits, and generates complete, push-ready pull requests for fixes.
 
 ---
 
 ## 🏗️ System Architecture & Agent Flow
 
-RepoGuardian uses an orchestrator pattern to coordinate **five specialized AI agents** that run in sequence.
+RepoGuardian uses an orchestrator pattern to coordinate **six specialized AI agents** that run in sequence.
 
 ```
                   ┌──────────────────────┐
@@ -20,7 +20,7 @@ RepoGuardian uses an orchestrator pattern to coordinate **five specialized AI ag
                              ▼
                     ┌─────────────────┐
                     │  Explorer Agent │ ──► Installs dependencies & runs sandboxed app
-                    └────────┬────────┘     (Captures console errors via Playwright)
+                    └────────┬────────┘     (Captures console errors & screenshot via Playwright)
                              ▼
                     ┌─────────────────┐
                     │  Auditor Agent  │ ──► Maps captured console errors to specific
@@ -32,7 +32,11 @@ RepoGuardian uses an orchestrator pattern to coordinate **five specialized AI ag
                              ▼
                     ┌─────────────────┐
                     │  Executor Agent │ ──► Generates precise code diffs & submits
-                    └─────────────────┘     GitHub PR (upon user approval)
+                    └────────┬────────┘     GitHub PR (upon user approval)
+                             ▼
+                    ┌─────────────────┐
+                    │  Market Agent   │ ──► Analyzes market potential & viability
+                    └─────────────────┘
 ```
 
 | Agent Name | Primary Role | Core Technologies / Models |
@@ -42,6 +46,20 @@ RepoGuardian uses an orchestrator pattern to coordinate **five specialized AI ag
 | **Auditor Agent** | Correlates raw front-end or server-side console errors back to structural lines of source code. | Gemini API, Contextual Diffs |
 | **Architect Agent** | Analyzes the static codebase for security loopholes (e.g. exposed credentials) and architecture anti-patterns. | Gemini API, Static RegEx Scanner |
 | **Executor Agent** | Produces code adjustments and publishes a clean Git branch + Pull Request to the origin repository. | GitPython, PyGithub, Gemini API |
+| **Market Agent** | Analyzes market potential, viability, and competitive landscape of the repository. | Gemini API, Startup Strategist Prompt |
+
+---
+
+### 🚀 V2 Features & Enhancements
+
+* **6th Agent - Market Agent ("The Strategist")**: Analyzes startup roadmap, market size, audience segments, competitor advantages/weaknesses, and gives a project viability score.
+* **Enhanced Security & Health Scores**: Multi-factor scoring across codebase health, quality, maintainability, documentation, and security (graded out of 100).
+* **Interactive Next.js Dashboard**:
+  * **Live Trace**: Real-time SSE logs streamed directly from the agent pipelines.
+  * **Browser Tab**: Visualizes console logs and takes live baseline screenshots of the booted app.
+  * **Issues & Fixes**: A code diff viewer to review, modify, and push AI-generated repairs.
+  * **Security Audit Tab**: Provides deep scans of credential exposures and PII leaks.
+  * **Market intelligence Tab**: Details competitor pricing models, unique market gaps, and risk mitigation strategies.
 
 ---
 
@@ -194,7 +212,8 @@ RepoGuardian/
 │   │   ├── explorer.py       # Runtime execution & error capture agent
 │   │   ├── auditor.py        # Error trace-mapping agent
 │   │   ├── architect.py      # Static code & safety review agent
-│   │   └── executor.py       # Git Branch & PR creation agent
+│   │   ├── executor.py       # Git Branch & PR creation agent
+│   │   └── market_agent.py   # Market viability & strategist agent
 │   ├── main.py               # REST Endpoints
 │   ├── orchestrator.py       # Sequential execution controller
 │   ├── db.py                 # Supabase communication layer
